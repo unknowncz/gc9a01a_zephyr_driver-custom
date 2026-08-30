@@ -304,7 +304,7 @@ static int gc9a01a_set_brightness(const struct device *dev,
 				  const uint8_t brightness)
 {
 	const struct gc9a01a_config *config = dev->config;
-	uint32_t step=config->backlight.period/100;
+	uint32_t step=config->backlight.period/255;
 	int ret = pwm_set_pulse_dt(&config->backlight,brightness*step);
 
 	if(ret){

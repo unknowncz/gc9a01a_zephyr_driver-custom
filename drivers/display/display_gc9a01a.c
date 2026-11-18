@@ -68,32 +68,45 @@ int gc9a01a_transmit(const struct device *dev, uint8_t cmd, const void *tx_data,
 	const struct gc9a01a_config *config = dev->config;
 
 	int r;
-	struct spi_buf tx_buf;
+	struct spi_buf tx_buf = { .buf = &cmd, .len = 1U};
 	struct spi_buf_set tx_bufs = { .buffers = &tx_buf, .count = 1U };
-
-	/* send command */
-	tx_buf.buf = &cmd;
-	tx_buf.len = 1U;
 
 	gpio_pin_set_dt(&config->cmd_data, GC9A01A_CMD);
 	r = spi_write_dt(&config->spi, &tx_bufs);
-	if (r < 0) {
-		return r;
-	}
 
 	/* send data (if any) */
-	if (tx_data != NULL) {
+	if (tx_data != NULL && r == 0) {
 		tx_buf.buf = (void *)tx_data;
 		tx_buf.len = tx_len;
 
 		gpio_pin_set_dt(&config->cmd_data, GC9A01A_DATA);
 		r = spi_write_dt(&config->spi, &tx_bufs);
-		if (r < 0) {
-			return r;
-		}
+		
 	}
 
-	return 0;
+	return r;
+}
+
+
+int gc9a01a_transcieve(const struct device *dev, uint8_t cmd, const void *rx_data,
+		     size_t rx_len)
+{
+	const struct gc9a01a_config *config = dev->config;
+
+	int r;
+	struct spi_buf buf = { .buf = &cmd, .len = 1U};
+	struct spi_buf_set bufs = { .buffers = &buf, .count = 1U };
+
+	gpio_pin_set_dt(&config->cmd_data, GC9A01A_CMD);
+	r = spi_write_dt(&config->spi, &bufs);
+	if (r < 0) return r;
+
+	buf.buf = (void *)rx_data;
+	buf.len = rx_len;
+
+	gpio_pin_set_dt(&config->cmd_data, GC9A01A_DATA);
+	r = spi_write_dt(&config->spi, &bufs);
+	return r;
 }
 
 /**
@@ -380,6 +393,14 @@ static int gc9a01a_init(const struct device *dev)
 		return r;
 	}
 
+	uint8_t recv_buf[4];
+
+	gc9a01a_transcieve(dev, 0x04, recv_buf, 4);
+
+	LOG_INF("Display init manufacturer code: %.2x %.2x %.2x %.2x", recv_buf[0], recv_buf[1], recv_buf[2], recv_buf[3]);
+
+	gc9a01a_set_brightness(dev,0);
+	
 	return 0;
 }
 
